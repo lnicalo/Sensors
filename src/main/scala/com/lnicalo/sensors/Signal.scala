@@ -19,12 +19,24 @@ class Signal[K, V: Fractional](val parent: RDD[(K, List[(Double, V)])])
 
   protected def getPartitions: Array[Partition] = parent.partitions
 
-  def applyPairWiseOperation(that: RDD[(K, List[(Double, V)])])(op: (V, V) => V): Signal[K, V] =
-      new Signal[K, V](parent.join(that).mapValues { case (v, w) => Signal.PairWiseOperation[V, V](v, w)(op) })
+  def applyPairWiseOperation(that: Signal[K, V])(op: (V, V) => V): Signal[K, V] =
+    new Signal[K, V](this.join(that).mapValues { case (v, w) => Signal.PairWiseOperation[V, V](v, w)(op) })
+
+  def applyBooleanOperation(that: Signal[K, V])(op: (V, V) => Boolean): Partitioner[K] = {
+    new Partitioner[K](this.join(that).mapValues { case (v, w) => Signal.PairWiseOperation[V, Boolean](v, w)(op) })
+  }
 
   def applyPairWiseOperation(that: V)(op: (V, V) => V): Signal[K, V] =
-      new Signal[K, V](parent.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
+    new Signal[K, V](this.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
 
+  def applyBooleanOperation(that: V)(op: (V, V) => Boolean): Partitioner[K] =
+    new Partitioner[K](this.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  //
+  // Math operations
+  //
+  ///////////////////////////////////////////////////////////////////////////////////////
   // Sum
   def +(that: Signal[K, V]) = applyPairWiseOperation(that) { implicitly[Fractional [V]] plus (_, _) }
   def +(that: V) = applyPairWiseOperation(that) { implicitly[Fractional [V]] plus (_, _) }
@@ -47,17 +59,40 @@ class Signal[K, V: Fractional](val parent: RDD[(K, List[(Double, V)])])
   def *(that: Signal[K, V]) = applyPairWiseOperation(that) { implicitly[Fractional [V]] times (_, _) }
   def *(that: V) = applyPairWiseOperation(that) { implicitly[Fractional [V]] times (_, _) }
   def *:(that: V) = this * that
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  //
+  // Boolean operations
+  //
+  ///////////////////////////////////////////////////////////////////////////////////////
+  def >(that: V) = applyBooleanOperation(that) { implicitly[Fractional [V]] gt (_, _) }
+  def >=(that: V) = applyBooleanOperation(that) { implicitly[Fractional [V]] gteq (_, _) }
+  def <(that: V) = applyBooleanOperation(that) { implicitly[Fractional [V]] lt (_, _) }
+  def <=(that: V) = applyBooleanOperation(that) { implicitly[Fractional [V]] lteq (_, _) }
+  def ==(that: V) = applyBooleanOperation(that) { implicitly[Fractional [V]] equiv (_, _) }
+
+  def >(that: Signal[K, V]) = applyBooleanOperation(that) { implicitly[Fractional [V]] gt (_, _) }
+  def >=(that: Signal[K, V]) = applyBooleanOperation(that) { implicitly[Fractional [V]] gteq (_, _) }
+  def <(that: Signal[K, V]) = applyBooleanOperation(that) { implicitly[Fractional [V]] lt (_, _) }
+  def <=(that: Signal[K, V]) = applyBooleanOperation(that) { implicitly[Fractional [V]] lteq (_, _) }
+  def ==(that: Signal[K, V]) = applyBooleanOperation(that) { implicitly[Fractional [V]] equiv (_, _) }
+
+
 }
 
 object Signal {
-  def PairWiseOperation[T,O](v: List[(Double, T)], w: List[(Double, T)])(f: (T,T) => O): List[(Double, O)] = {
+  def PairWiseOperation[V,O](v: List[(Double, V)], w: List[(Double, V)])(f: (V,V) => O): List[(Double, O)] = {
     @tailrec
-    def recursive(v: List[(Double, T)], w: List[(Double, T)], acc: List[(Double, O)]): List[(Double, O)] = {
+    def recursive(v: List[(Double, V)], w: List[(Double, V)], acc: List[(Double, O)]): List[(Double, O)] = {
       if (v.isEmpty || w.isEmpty) acc
       else {
         val d = w.head
         val e = v.head
-        if (d._1 > e._1) {
+        if (d._1 == e._1) {
+          val s = (d._1, f(e._2, d._2))
+          recursive(v.tail, w.tail, s :: acc)
+        }
+        else if (d._1 > e._1) {
           val s = (d._1, f(e._2, d._2))
           recursive(v, w.tail, s :: acc)
         } else {
