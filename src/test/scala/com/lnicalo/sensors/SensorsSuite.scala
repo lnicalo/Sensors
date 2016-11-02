@@ -5,7 +5,7 @@ package com.lnicalo.sensors
   */
 
 import org.apache.spark.{SparkConf, SparkContext}
-import TimeSeriesUtils.DoubleOps
+//import TimeSeriesUtils.DoubleOps
 
 import org.scalatest.{FunSuite, ShouldMatchers}
 
@@ -44,17 +44,21 @@ class SensorsSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     val signal = Signal(Array(("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
       ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
 
-    var output = (3 * signal).collectAsMap()
+    var output = (3 *: signal).collectAsMap()
     output("1") should be (List((1.0, 3.0), (2.0, 6.0), (3.0, 9.0)))
     output("2") should be (List((10.0, 30.0), (20.0, 60.0), (30.0, 90.0)))
 
-    output = (3 - signal).collectAsMap()
+    output = (3 -: signal).collectAsMap()
     output("1") should be (List((1.0, 2.0), (2.0, 1.0), (3.0, 0.0)))
     output("2") should be (List((10.0, -7.0), (20.0, -17.0), (30.0, -27.0)))
 
-    output = (3 - 2 * signal).collectAsMap()
-    output("1") should be (List((1.0, 1.0), (2.0, -1.0), (3.0, -3.0)))
-    output("2") should be (List((10.0, -17.0), (20.0, -37.0), (30.0, -57.0)))
+    output = ((3 -: 2 *: signal) / 2).collectAsMap()
+    output("1") should be (List((1.0, 0.5), (2.0, -0.5), (3.0, -1.5)))
+    output("2") should be (List((10.0, -8.5), (20.0, -18.5), (30.0, -28.5)))
+
+    output = (-signal).collectAsMap()
+    output("1") should be (List((1.0, -1.0), (2.0, -2.0), (3.0, -3.0)))
+    output("2") should be (List((10.0, -10.0), (20.0, -20.0), (30.0, -30.0)))
   }
 
 }
