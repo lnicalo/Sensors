@@ -138,14 +138,14 @@ object Signal {
       }
     }
 
-    def removeDuplicates(v: List[(Double, Boolean)]): List[(Double, Boolean)] = {
-      v.foldRight(List(v.last))((s, result) => if (s._2 == result.head._2) result else s :: result)
-    }
     // Remove contiguous duplicate values from filter:
     //  The algorithm relies on the fact that
     //  there are not contiguous duplicates in the list that works as a filter
-    val tmp = removeDuplicates(filter.reverse)
-
+    // IMPORTANT NOTE: It reverses the list. Timestamps are in decreasing order
+    def removeDuplicates(v: List[(Double, Boolean)]): List[(Double, Boolean)] = {
+      v.foldLeft(List(v.head))((result, s) => if (s._2 == result.head._2) result else s :: result)
+    }
+    val tmp = removeDuplicates(filter)
     val init_acc = ArrayBuffer[(Double, V)]()
     recursive(v.reverse, tmp, List(init_acc))
       .filter(_.length > 1).map(_.toList.reverse)
