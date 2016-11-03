@@ -115,4 +115,19 @@ class SensorsSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     output("2") should be (List((10.0, false), (20.0, false), (30.0, false)))
   }
 
+  test("filter by other signal") {
+    val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
+    sc = new SparkContext(conf)
+
+    val signal1 = Signal(Array(
+      ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
+      ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
+    val signal2 = Signal(Array(
+      ("1", List((1.5, 1.5), (2.5, 2.0), (3.5, 3.5))),
+      ("2", List((10.5, 10.5), (20.5, 1.5), (30.5, -30.5))) ))
+
+    val output = signal1.where(signal2 >= 2).collectAsMap()
+    output("1") should be (List(List((2.5,2.0), (3.0,3.0))))
+    output("2") should be (List(List((10.5,10.0), (20.0,20.0), (20.5,20.0))))
+  }
 }
