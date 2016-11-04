@@ -4,12 +4,12 @@ import org.apache.spark.rdd._
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.annotation.tailrec
+import scala.collection.immutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Random
 
-class Signal[K, V: Fractional](val parent: RDD[(K, List[(Double, V)])])
-                              (implicit kt: ClassTag[K], vt: ClassTag[V])
+class Signal[K: ClassTag, V: Fractional: ClassTag](val parent: RDD[(K, List[(Double, V)])])
   extends RDD[(K, List[(Double, V)])](parent){
 
   def compute(split: Partition, context: TaskContext): Iterator[(K, List[(Double, V)])] =
@@ -81,6 +81,13 @@ class Signal[K, V: Fractional](val parent: RDD[(K, List[(Double, V)])])
   def where(that: Filter[K]): FilteredSignal[K, V] = {
     applyFilter(that)
   }
+
+  def timings() = this.mapValues { x =>
+      val startTimeStamp = x.head._1
+      val endTimeStamp = x.last._1
+      val duration = endTimeStamp - startTimeStamp
+      HashMap[String, Double]("Start" -> startTimeStamp, "End" -> endTimeStamp, "Duration" -> duration)
+    }
 }
 
 object Signal {
@@ -151,7 +158,7 @@ object Signal {
       .filter(_.length > 1).map(_.toList.reverse)
   }
 
-  def uniform_random_sample (n_samples: Array[Int]) (implicit sc: SparkContext): Signal[String, Double] = {
+  def uniform_random_sample (n_samples: Array[Int]) (implicit sc: SparkContext) = {
     var index = 0
     val data = n_samples.map(n => {
       index += 1
@@ -160,8 +167,11 @@ object Signal {
     new Signal(sc.parallelize(data, 1))
   }
 
-  def apply[K, V: Fractional](local: Array[(K, List[(Double, V)])])
-              (implicit sc: SparkContext, kt: ClassTag[K], vt: ClassTag[V]): Signal[K, V] =
+  def apply[K: ClassTag, V: Fractional: ClassTag](local: Array[(K, List[(Double, V)])])
+                                                 (implicit sc: SparkContext) =
     new Signal[K, V](sc.parallelize(local))
+
+  def apply[K: ClassTag, V: Fractional: ClassTag](rdd: RDD[(K, List[(Double, V)])]) =
+    new Signal[K,V](rdd)
 }
 

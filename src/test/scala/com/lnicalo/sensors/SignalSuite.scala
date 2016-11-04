@@ -9,7 +9,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import org.scalatest.{FunSuite, ShouldMatchers}
 
-class SensorsSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
+class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
   test("random sample") {
     val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
     sc = new SparkContext(conf)

@@ -5,8 +5,7 @@ import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
-class Filter[K](val parent: RDD[(K, List[(Double, Boolean)])])
-               (implicit val kClassTag: ClassTag[K])
+class Filter[K: ClassTag](val parent: RDD[(K, List[(Double, Boolean)])])
   extends RDD[(K, List[(Double, Boolean)])](parent){
 
   def compute(split: Partition, context: TaskContext): Iterator[(K, List[(Double, Boolean)])] =
@@ -31,8 +30,8 @@ class Filter[K](val parent: RDD[(K, List[(Double, Boolean)])])
 }
 
 object Filter {
-  def apply[K](local: Array[(K, List[(Double, Boolean)])])
-                             (implicit sc: SparkContext, kClassTag: ClassTag[K]): Filter[K] =
+  def apply[K: ClassTag](local: Array[(K, List[(Double, Boolean)])])
+                        (implicit sc: SparkContext) =
     new Filter[K](sc.parallelize(local))
 }
 
