@@ -9,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.Random
 
-class Signal[K: ClassTag, V : Fractional: ClassTag](val parent: RDD[(K, List[(Double, V)])])
+class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, List[(Double, V)])])
   extends RDD[(K, List[(Double, V)])](parent) {
 
   type Ops = (List[(Double, V)]) => HashMap[String, Any]
@@ -20,142 +20,47 @@ class Signal[K: ClassTag, V : Fractional: ClassTag](val parent: RDD[(K, List[(Do
 
   protected def getPartitions: Array[Partition] = parent.partitions
 
-  private def applyPairWiseOperation(that: Signal[K, V])(op: (V, V) => V): Signal[K, V] =
-    new Signal[K, V](this.join(that).mapValues { case (v, w) => Signal.PairWiseOperation[V, V, V](v, w)(op) })
+  private[sensors] def applyPairWiseOperation(that: Signal[K, V])(op: (V, V) => V): Signal[K, V] =
+    new Signal[K, V](parent.join(that.parent).mapValues { case (v, w) => Signal.PairWiseOperation[V, V, V](v, w)(op) })
 
-  private def applyBooleanOperation(that: Signal[K, V])(op: (V, V) => Boolean): Filter[K] =
-    new Filter[K](this.join(that).mapValues { case (v, w) => Signal.PairWiseOperation[V, V, Boolean](v, w)(op) })
+  private[sensors] def applyBooleanOperation(that: Signal[K, V])(op: (V, V) => Boolean): Signal[K, Boolean] =
+    new Signal[K, Boolean](parent.join(that.parent).mapValues {
+      case (v, w) => Signal.PairWiseOperation[V, V, Boolean](v, w)(op)
+    })
 
-  private def applyPairWiseOperation(that: V)(op: (V, V) => V): Signal[K, V] =
-    new Signal[K, V](this.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
+  private[sensors] def applyPairWiseOperation(that: V)(op: (V, V) => V): Signal[K, V] =
+    new Signal[K, V](parent.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
 
-  private def applyBooleanOperation(that: V)(op: (V, V) => Boolean): Filter[K] =
-    new Filter[K](this.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
+  private[sensors] def applyBooleanOperation(that: V)(op: (V, V) => Boolean): Signal[K, Boolean] =
+    new Signal[K, Boolean](
+      Signal(parent.mapValues {
+        x => x.map(v => (v._1, op(v._2, that)))
+      })
+    )
 
-  private def applyFilter(that: Filter[K]): FilteredSignal[K, V] =
-    new FilteredSignal[K, V](this.join(that).mapValues { case (v, filter) => Signal.FilterOperation(v, filter) })
+  private[sensors] def applyFilter(that: Signal[K, Boolean]): FilteredSignal[K, V] =
+    new FilteredSignal[K, V](parent.join(that).mapValues { case (v, filter) => Signal.FilterOperation(v, filter) })
 
-  ///////////////////////////////////////////////////////////////////////////////////////
-  //
-  // Math operations
-  //
-  ///////////////////////////////////////////////////////////////////////////////////////
-  // Sum
-  def +(that: Signal[K, V]) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] plus(_, _)
-  }
-
-  def +(that: V) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] plus(_, _)
-  }
-
-  def +:(that: V) = this + that
-
-  // Minus
-  def -(that: Signal[K, V]) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] minus(_, _)
-  }
-
-  def -(that: V) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] minus(_, _)
-  }
-
-  def -:(that: V) = applyPairWiseOperation(that) { (x, y) => implicitly[Fractional[V]] minus(y, x) }
-
-  // Negate
-  def unary_- = new Signal[K, V](parent.mapValues(x => x.map(v => (v._1, implicitly[Fractional[V]] negate v._2))))
-
-  // Division
-  def /(that: Signal[K, V]) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] div(_, _)
-  }
-
-  def /(that: V) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] div(_, _)
-  }
-
-  def /:(that: V) = applyPairWiseOperation(that) { (x, y) => implicitly[Fractional[V]] div(y, x) }
-
-  // Multiplication
-  def *(that: Signal[K, V]) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] times(_, _)
-  }
-
-  def *(that: V) = applyPairWiseOperation(that) {
-    implicitly[Fractional[V]] times(_, _)
-  }
-
-  def *:(that: V) = this * that
-
-  ///////////////////////////////////////////////////////////////////////////////////////
-  //
-  // Boolean operations
-  //
-  ///////////////////////////////////////////////////////////////////////////////////////
-  def >(that: V) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] gt(_, _)
-  }
-
-  def >=(that: V) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] gteq(_, _)
-  }
-
-  def <(that: V) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] lt(_, _)
-  }
-
-  def <=(that: V) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] lteq(_, _)
-  }
-
-  def ==(that: V) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] equiv(_, _)
-  }
-
-  def >(that: Signal[K, V]) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] gt(_, _)
-  }
-
-  def >=(that: Signal[K, V]) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] gteq(_, _)
-  }
-
-  def <(that: Signal[K, V]) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] lt(_, _)
-  }
-
-  def <=(that: Signal[K, V]) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] lteq(_, _)
-  }
-
-  def ==(that: Signal[K, V]) = applyBooleanOperation(that) {
-    implicitly[Fractional[V]] equiv(_, _)
-  }
 
   // Filter
-  def where(that: Filter[K]): FilteredSignal[K, V] = {
+  def where(that: Signal[K, Boolean]): FilteredSignal[K, V] = {
     applyFilter(that)
   }
 
+  // Operations
   def timings() = this.addOp(Signal.timings)
 
   def lastValue(): Signal[K,V] = this.addOp(Signal.last)
 
   def firstValue(): Signal[K,V] = this.addOp(Signal.first)
 
-  def avg(): Signal[K,V] = this.addOp(Signal.avg[V])
-
-  def area(): Signal[K,V] = this.addOp(Signal.area[V])
-
-  def span(): Signal[K,V] = this.addOp(Signal.span[V])
-
   def addOp(f: Ops): Signal[K, V] = {
     this.ops ::= f
     this
   }
 
-  def toDataset: Dataset[K] = {
-    val signal = this.mapValues { x =>
+  def toDataset = {
+    val rdd = parent.mapValues { x =>
       var r = HashMap[String, Any]()
       for(op <- ops) {
         val out = op(x)
@@ -163,11 +68,32 @@ class Signal[K: ClassTag, V : Fractional: ClassTag](val parent: RDD[(K, List[(Do
       }
       r
     }
-    new Dataset[K](signal)
+    rdd.collectAsMap()
   }
 }
 
 object Signal {
+  implicit def signalToBooleanSignalFunctions[K]
+   (signal: Signal[K, Boolean])
+   (implicit kt: ClassTag[K]):
+   BooleanSignalFunctions[K] = {
+      new BooleanSignalFunctions[K](signal)
+  }
+
+  implicit def signalToMathSignalFunctions[K, V: Fractional]
+    (signal: Signal[K, V])
+    (implicit kt: ClassTag[K], vt: ClassTag[V]):
+    MathSignalFunctions[K,V] = {
+      new MathSignalFunctions(signal)
+    }
+
+  implicit def signalToStringSignalFunctions[K]
+    (signal: Signal[K, String])
+    (implicit kt: ClassTag[K]):
+    StringSignalFunctions[K] = {
+      new StringSignalFunctions(signal)
+    }
+
   def timings[V](x: List[(Double, V)]) = {
     val startTimeStamp = x.head._1
     val endTimeStamp = x.last._1
@@ -182,26 +108,7 @@ object Signal {
     HashMap[String, V]("First" -> x.head._2)
   }
 
-  def span[V: Fractional](x: List[(Double, V)]): HashMap[String, V] = {
-    val a: HashMap[String, V] = last(x)
-    val b: HashMap[String, V] = first(x)
-    var out = b
-    out = out.updated("Last", a("Last"))
-    out.updated("Span", implicitly[Fractional[V]].minus(a("Last"), b("First")))
-  }
 
-  def avg[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val avg = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 } /
-      y.foldLeft(0.0) { (a, b) => a + b._2 }
-    HashMap[String, Double]("Avg" -> avg)
-  }
-
-  def area[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val area = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 }
-    HashMap[String, Double]("Area" -> area)
-  }
 
   def PairWiseOperation[A,B,O](v: List[(Double, A)], w: List[(Double, B)])(f: (A,B) => O): List[(Double, O)] = {
     @tailrec
@@ -279,11 +186,11 @@ object Signal {
     new Signal(sc.parallelize(data, 1))
   }
 
-  def apply[K: ClassTag, V: Fractional: ClassTag](local: Array[(K, List[(Double, V)])])
+  def apply[K: ClassTag, V: ClassTag](local: Array[(K, List[(Double, V)])])
                                                  (implicit sc: SparkContext) =
     new Signal[K, V](sc.parallelize(local))
 
-  def apply[K: ClassTag, V: Fractional: ClassTag](rdd: RDD[(K, List[(Double, V)])]) =
+  def apply[K: ClassTag, V: ClassTag](rdd: RDD[(K, List[(Double, V)])]) =
     new Signal[K,V](rdd)
 }
 
