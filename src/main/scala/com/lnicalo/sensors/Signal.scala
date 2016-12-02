@@ -20,31 +20,21 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, List[(Double, V)])])
 
   protected def getPartitions: Array[Partition] = parent.partitions
 
-  private[sensors] def applyPairWiseOperation(that: Signal[K, V])(op: (V, V) => V): Signal[K, V] =
-    new Signal[K, V](parent.join(that.parent).mapValues { case (v, w) => Signal.PairWiseOperation[V, V, V](v, w)(op) })
-
-  private[sensors] def applyBooleanOperation(that: Signal[K, V])(op: (V, V) => Boolean): Signal[K, Boolean] =
-    new Signal[K, Boolean](parent.join(that.parent).mapValues {
-      case (v, w) => Signal.PairWiseOperation[V, V, Boolean](v, w)(op)
+  private[sensors] def applyPairWiseOperation[O: ClassTag](that: Signal[K, V])(op: (V, V) => O): Signal[K, O] =
+    new Signal(parent.join(that.parent).mapValues {
+      case (v, w) => Signal.PairWiseOperation[V, V, O](v, w)(op)
     })
 
-  private[sensors] def applyPairWiseOperation(that: V)(op: (V, V) => V): Signal[K, V] =
-    new Signal[K, V](parent.mapValues(x => x.map(v => (v._1, op(v._2, that)))))
-
-  private[sensors] def applyBooleanOperation(that: V)(op: (V, V) => Boolean): Signal[K, Boolean] =
-    new Signal[K, Boolean](
-      Signal(parent.mapValues {
-        x => x.map(v => (v._1, op(v._2, that)))
-      })
-    )
-
-  private[sensors] def applyFilter(that: Signal[K, Boolean]): FilteredSignal[K, V] =
-    new FilteredSignal[K, V](parent.join(that).mapValues { case (v, filter) => Signal.FilterOperation(v, filter) })
-
+  private[sensors] def applyPairWiseOperation[O: ClassTag](that: V)(op: (V, V) => O): Signal[K, O] =
+    new Signal(parent.mapValues {
+      x => x.map(v => (v._1, op(v._2, that)))
+    })
 
   // Filter
   def where(that: Signal[K, Boolean]): FilteredSignal[K, V] = {
-    applyFilter(that)
+    new FilteredSignal(parent.join(that).mapValues {
+      case (v, filter) => Signal.FilterOperation(v, filter)
+    })
   }
 
   // Operations

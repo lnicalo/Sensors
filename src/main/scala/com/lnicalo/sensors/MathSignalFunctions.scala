@@ -73,43 +73,43 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
   // Boolean operations
   //
   ///////////////////////////////////////////////////////////////////////////////////////
-  def >(that: V) = self.applyBooleanOperation(that) {
+  def >(that: V) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] gt(_, _)
   }
 
-  def >=(that: V) = self.applyBooleanOperation(that) {
+  def >=(that: V) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] gteq(_, _)
   }
 
-  def <(that: V) = self.applyBooleanOperation(that) {
+  def <(that: V) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] lt(_, _)
   }
 
-  def <=(that: V) = self.applyBooleanOperation(that) {
+  def <=(that: V) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] lteq(_, _)
   }
 
-  def |==|(that: V) = self.applyBooleanOperation(that) {
+  def |==|(that: V) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] equiv(_, _)
   }
 
-  def >(that: Signal[K, V]) = self.applyBooleanOperation(that) {
+  def >(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] gt(_, _)
   }
 
-  def >=(that: Signal[K, V]) = self.applyBooleanOperation(that) {
+  def >=(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] gteq(_, _)
   }
 
-  def <(that: Signal[K, V]) = self.applyBooleanOperation(that) {
+  def <(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] lt(_, _)
   }
 
-  def <=(that: Signal[K, V]) = self.applyBooleanOperation(that) {
+  def <=(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] lteq(_, _)
   }
 
-  def |==|(that: Signal[K, V]) = self.applyBooleanOperation(that) {
+  def |==|(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] equiv(_, _)
   }
 
