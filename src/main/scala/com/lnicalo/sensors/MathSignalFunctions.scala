@@ -1,8 +1,5 @@
 package com.lnicalo.sensors
 
-import org.apache.spark.rdd.RDD
-
-import scala.collection.immutable.HashMap
 import scala.reflect.ClassTag
 
 /**
@@ -112,34 +109,5 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
   def |==|(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
     implicitly[Fractional[V]] equiv(_, _)
   }
-
-
-  def avg(): Signal[K,V] = self.addOp(MathSignalFunctions.avg[V])
-
-  def area(): Signal[K,V] = self.addOp(MathSignalFunctions.area[V])
-
-  def span(): Signal[K,V] = self.addOp(MathSignalFunctions.span[V])
 }
 
-object MathSignalFunctions {
-  def span[V: Fractional](x: List[(Double, V)]): HashMap[String, V] = {
-    val a: HashMap[String, V] = Signal.last(x)
-    val b: HashMap[String, V] = Signal.first(x)
-    var out = b
-    out = out.updated("Last", a("Last"))
-    out.updated("Span", implicitly[Fractional[V]].minus(a("Last"), b("First")))
-  }
-
-  def avg[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val avg = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 } /
-      y.foldLeft(0.0) { (a, b) => a + b._2 }
-    HashMap[String, Double]("Avg" -> avg)
-  }
-
-  def area[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val area = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 }
-    HashMap[String, Double]("Area" -> area)
-  }
-}

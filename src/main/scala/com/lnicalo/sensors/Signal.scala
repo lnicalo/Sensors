@@ -1,5 +1,5 @@
 package com.lnicalo.sensors
-
+import scala.language.implicitConversions
 import org.apache.spark.rdd._
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 
@@ -37,17 +37,7 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, List[(Double, V)])])
     })
   }
 
-  // Operations
-  def timings() = this.addOp(Signal.timings)
 
-  def lastValue(): Signal[K,V] = this.addOp(Signal.last)
-
-  def firstValue(): Signal[K,V] = this.addOp(Signal.first)
-
-  def addOp(f: Ops): Signal[K, V] = {
-    this.ops ::= f
-    this
-  }
 
   def toDataset = {
     val rdd = parent.mapValues { x =>
@@ -63,6 +53,27 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, List[(Double, V)])])
 }
 
 object Signal {
+  implicit def signalToFilteredSignal[K, V]
+  (signal: Signal[K, V])
+  (implicit kt: ClassTag[K], vt: ClassTag[V]):
+  FilteredSignal[K, V] = {
+    new FilteredSignal[K, V](signal.mapValues(x => List(x)))
+  }
+
+  implicit def mathSignalToMathFilteredSignalFunctions[K, V: Fractional]
+  (signal: Signal[K, V])
+  (implicit kt: ClassTag[K], vt: ClassTag[V], f: Signal[K,V] => FilteredSignal[K,V]):
+  MathFilteredSignalFunctions[K, V] = {
+    new MathFilteredSignalFunctions[K, V](signal)
+  }
+
+  implicit def signalToBooleanSignalFunctions[K, V: Fractional]
+  (signal: FilteredSignal[K, V])
+  (implicit kt: ClassTag[K], vt: ClassTag[V]):
+  MathFilteredSignalFunctions[K, V] = {
+    new MathFilteredSignalFunctions[K, V](signal)
+  }
+
   implicit def signalToBooleanSignalFunctions[K]
    (signal: Signal[K, Boolean])
    (implicit kt: ClassTag[K]):
@@ -83,22 +94,6 @@ object Signal {
     StringSignalFunctions[K] = {
       new StringSignalFunctions(signal)
     }
-
-  def timings[V](x: List[(Double, V)]) = {
-    val startTimeStamp = x.head._1
-    val endTimeStamp = x.last._1
-    val duration = endTimeStamp - startTimeStamp
-    HashMap[String, Double]("Start" -> startTimeStamp, "End" -> endTimeStamp, "Duration" -> duration)
-  }
-  def last[V](x: List[(Double, V)]): HashMap[String, V] = {
-    HashMap[String, V]("Last" -> x(x.length - 2)._2)
-  }
-
-  def first[V](x: List[(Double, V)]): HashMap[String, V] =  {
-    HashMap[String, V]("First" -> x.head._2)
-  }
-
-
 
   def PairWiseOperation[A,B,O](v: List[(Double, A)], w: List[(Double, B)])(f: (A,B) => O): List[(Double, O)] = {
     @tailrec
@@ -178,9 +173,25 @@ object Signal {
 
   def apply[K: ClassTag, V: ClassTag](local: Array[(K, List[(Double, V)])])
                                                  (implicit sc: SparkContext) =
-    new Signal[K, V](sc.parallelize(local))
+    new Signal(sc.parallelize(local))
 
   def apply[K: ClassTag, V: ClassTag](rdd: RDD[(K, List[(Double, V)])]) =
-    new Signal[K,V](rdd)
+    new Signal(rdd)
+
+  /*def apply[K: ClassTag, V: ClassTag](): Signal[K,V] = {
+    val tableName = ""
+
+    val sparkConf = new SparkConf().setAppName("HBaseDistributedScanExample " + tableName )
+    val sc = new SparkContext(sparkConf)
+
+    val rdd = sc.hbaseTable[Double]("table")
+      .select("col")
+      .inColumnFamily("columnFamily")
+      .withStartRow("00501")
+      .withSalting((0 to 9).map(s => s.toString))
+
+    rdd.
+    new Signal(rdd)
+  }*/
 }
 

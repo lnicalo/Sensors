@@ -8,8 +8,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 import scala.collection.immutable.HashMap
 
 import org.scalatest.{FunSuite, ShouldMatchers}
-
-class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
+import com.lnicalo.sensors.Signal._
+class OperationsWithSignalsSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
   test("timings") {
     val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
     sc = new SparkContext(conf)
@@ -21,8 +21,8 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       .timings()
       .toDataset
 
-    output("1") should be (HashMap("Start" -> 1.0, "End" -> 3.0, "Duration" -> 2.0))
-    output("2") should be (HashMap("Start" -> 10.0, "End" -> 30.0, "Duration" -> 20.0))
+    output("1") should be (HashMap("Start" -> Some(1.0), "End" -> Some(3.0), "Duration" -> Some(2.0)))
+    output("2") should be (HashMap("Start" -> Some(10.0), "End" -> Some(30.0), "Duration" -> Some(20.0)))
   }
 
   test("timings with filters") {
@@ -37,12 +37,13 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
     val output = signal1
       .where(signal1 > signal2)
+      .toActivations
       .timings()
       .toDataset
 
-    output(("1", (1.75, 2.0))) should be (HashMap("Start" -> 1.75, "End" -> 2.0, "Duration" -> 0.25))
-    output(("1", (2.5, 3.0))) should be (HashMap("Start" -> 2.5, "End" -> 3.0, "Duration" -> 0.5))
-    output(("2", (15, 20.0))) should be (HashMap("Start" -> 15.0, "End" -> 20.0, "Duration" -> 5.0))
+    output(("1", (1.75, 2.0))) should be (HashMap("Duration" -> Some(0.25), "Start" -> Some(1.75), "End" -> Some(2.0)))
+    output(("1", (2.5, 3.0))) should be (HashMap("Duration" -> Some(0.5), "Start" -> Some(2.5), "End" -> Some(3.0)))
+    output(("2", (15, 20.0))) should be (HashMap("Start" -> Some(15.0), "End" -> Some(20.0), "Duration" -> Some(5.0)))
   }
 
   test("last with filters") {
@@ -57,12 +58,13 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
     val output = signal1
       .where(signal1 > signal2)
+      .toActivations
       .lastValue()
       .toDataset
 
-    output(("1", (1.75, 2.0))) should be (HashMap("Last" -> 1.0))
-    output(("1", (2.5, 3.0))) should be (HashMap("Last" -> 0.25))
-    output(("2", (15, 20.0))) should be (HashMap("Last" -> 20.0))
+    output(("1", (1.75, 2.0))) should be (HashMap("Last" -> Some(1.0)))
+    output(("1", (2.5, 3.0))) should be (HashMap("Last" -> Some(0.25)))
+    output(("2", (15, 20.0))) should be (HashMap("Last" -> Some(20.0)))
   }
 
   test("weighted average") {
@@ -119,6 +121,7 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
     val output = signal1
       .where(signal1 > signal2)
+      .toActivations
       .span()
       .area()
       .avg()
