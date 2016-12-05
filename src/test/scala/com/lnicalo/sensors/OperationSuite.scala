@@ -40,9 +40,9 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       .timings()
       .toDataset
 
-    output(("1", (1.75, 2.0))) should be (HashMap("Start" -> 1.75, "End" -> 2.0, "Duration" -> 0.25))
-    output(("1", (2.5, 3.0))) should be (HashMap("Start" -> 2.5, "End" -> 3.0, "Duration" -> 0.5))
-    output(("2", (15, 20.0))) should be (HashMap("Start" -> 15.0, "End" -> 20.0, "Duration" -> 5.0))
+    output("1") should be (HashMap("Start" -> 1.75, "End" -> 2.0, "Duration" -> 0.25))
+    output("1") should be (HashMap("Start" -> 2.5, "End" -> 3.0, "Duration" -> 0.5))
+    output("2") should be (HashMap("Start" -> 15.0, "End" -> 20.0, "Duration" -> 5.0))
   }
 
   test("last with filters") {
@@ -60,9 +60,9 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       .lastValue()
       .toDataset
 
-    output(("1", (1.75, 2.0))) should be (HashMap("Last" -> 1.0))
-    output(("1", (2.5, 3.0))) should be (HashMap("Last" -> 0.25))
-    output(("2", (15, 20.0))) should be (HashMap("Last" -> 20.0))
+    output("1") should be (HashMap("Last" -> 1.0))
+    output("1") should be (HashMap("Last" -> 0.25))
+    output("2") should be (HashMap("Last" -> 20.0))
   }
 
   test("weighted average") {
@@ -124,11 +124,11 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       .avg()
       .toDataset
 
-    output(("1", (1.75, 2.0))) should be (
+    output("1") should be (
       HashMap("Area" -> 0.25, "Span" -> 0.0, "Avg" -> 1.0, "Last" -> 1.0, "First" -> 1.0))
-    output(("1", (2.5, 3.0))) should be (
+    output("1") should be (
       HashMap("Area" -> 0.125, "Span" -> 0.0, "Avg" -> 0.25, "Last" -> 0.25, "First" -> 0.25))
-    output(("2", (15, 20.0))) should be (
+    output("2") should be (
       HashMap("Area" -> 100.0, "Span" -> 0.0, "Avg" -> 20.0, "Last" -> 20.0, "First" -> 20.0))
   }
 }

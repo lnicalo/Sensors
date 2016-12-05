@@ -1,7 +1,5 @@
 package com.lnicalo.sensors
 
-import org.apache.spark.rdd.RDD
-
 import scala.collection.immutable.HashMap
 import scala.reflect.ClassTag
 
@@ -41,8 +39,14 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
   }
 
   // Negate
-  def unary_- = new Signal[K, V](self.parent.mapValues(
-    x => x.map(v => (v._1, implicitly[Fractional[V]] negate v._2))))
+  def unary_- = new Signal[K, V](self.parent.mapValues { x =>
+    x.map {v =>
+      v match {
+        case (t, Some(x)) => (t, Some(implicitly[Fractional[V]] negate x))
+        case (t, None) => (t, None)
+      }
+    }
+  })
 
   // Division
   def /(that: Signal[K, V]) = self.applyPairWiseOperation(that) {
@@ -114,11 +118,11 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
   }
 
 
-  def avg(): Signal[K,V] = self.addOp(MathSignalFunctions.avg[V])
+  def avg(): Signal[K,V] = self // .addOp(MathSignalFunctions.avg[V])
 
-  def area(): Signal[K,V] = self.addOp(MathSignalFunctions.area[V])
+  def area(): Signal[K,V] = self // .addOp(MathSignalFunctions.area[V])
 
-  def span(): Signal[K,V] = self.addOp(MathSignalFunctions.span[V])
+  def span(): Signal[K,V] = self // .addOp(MathSignalFunctions.span[V])
 }
 
 object MathSignalFunctions {
