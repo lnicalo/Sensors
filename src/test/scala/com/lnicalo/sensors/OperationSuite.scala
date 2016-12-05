@@ -18,11 +18,13 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
       ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
     val output = signal
-      .timings()
+      .duration()
       .toDataset
 
-    output("1") should be (HashMap("Start" -> 1.0, "End" -> 3.0, "Duration" -> 2.0))
-    output("2") should be (HashMap("Start" -> 10.0, "End" -> 30.0, "Duration" -> 20.0))
+    output("1") should be (HashMap("Start" -> Some(1.0),
+      "End" -> Some(3.0), "Duration" -> Some(2.0)))
+    output("2") should be (HashMap("Start" -> Some(10.0),
+      "End" -> Some(30.0), "Duration" -> Some(20.0)))
   }
 
   test("timings with filters") {
@@ -35,14 +37,20 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
     val signal2 = Signal(Array(
       ("1", List((1.5, 2.0), (1.75, 0.5), (2.5, 0.0))),
       ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
-    val output = signal1
+    val o = signal1
       .where(signal1 > signal2)
-      .timings()
+    val test = o.collectAsMap()
+
+    val output = o
+      .duration()
       .toDataset
 
-    output("1") should be (HashMap("Start" -> 1.75, "End" -> 2.0, "Duration" -> 0.25))
-    output("1") should be (HashMap("Start" -> 2.5, "End" -> 3.0, "Duration" -> 0.5))
-    output("2") should be (HashMap("Start" -> 15.0, "End" -> 20.0, "Duration" -> 5.0))
+    output("1") should be (HashMap("Start" -> Some(1.5),
+      "End" -> Some(3.0), "Duration" -> Some(1.5)))
+    output("2") should be (HashMap("Start" -> Some(15.0),
+      "End" -> Some(20.0), "Duration" -> Some(5.0)))
+
+    Map("Duration" -> Some(20.0), "Start" -> Some(10.0), "End" -> Some(30.0))
   }
 
   test("last with filters") {
@@ -60,9 +68,8 @@ class OperationSuite extends FunSuite with LocalSparkContext with ShouldMatchers
       .lastValue()
       .toDataset
 
-    output("1") should be (HashMap("Last" -> 1.0))
-    output("1") should be (HashMap("Last" -> 0.25))
-    output("2") should be (HashMap("Last" -> 20.0))
+    output("1") should be (HashMap("Last" -> Some(3.0)))
+    output("2") should be (HashMap("Last" -> Some(20.0)))
   }
 
   test("weighted average") {

@@ -122,16 +122,20 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
 
   def area(): Signal[K,V] = self // .addOp(MathSignalFunctions.area[V])
 
-  def span(): Signal[K,V] = self // .addOp(MathSignalFunctions.span[V])
+  def span(): Signal[K,V] = self.addOp(MathSignalFunctions.span[V])
 }
 
 object MathSignalFunctions {
-  def span[V: Fractional](x: List[(Double, V)]): HashMap[String, V] = {
-    val a: HashMap[String, V] = Signal.last(x)
-    val b: HashMap[String, V] = Signal.first(x)
-    var out = b
-    out = out.updated("Last", a("Last"))
-    out.updated("Span", implicitly[Fractional[V]].minus(a("Last"), b("First")))
+  def span[V: Fractional](x: Series[V]): HashMap[String, Option[V]] = {
+    val tmp = x.filter({case (t, Some(x)) => true case _ => false})
+    (tmp.headOption, tmp.lastOption) match {
+      case (Some((_, Some(first))), Some((_, Some(last)))) =>
+        HashMap[String, Option[V]]("First" -> Option(first),
+          "Last" -> Option(last),
+          "Span" -> Option(implicitly[Fractional[V]] minus (last, first)))
+      case _ => HashMap[String, Option[V]]("First" -> None,
+        "Last" -> None, "Span" -> None)
+    }
   }
 
   def avg[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {

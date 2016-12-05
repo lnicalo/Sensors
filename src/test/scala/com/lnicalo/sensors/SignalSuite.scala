@@ -5,6 +5,8 @@ package com.lnicalo.sensors
   */
 
 import org.apache.spark.{SparkConf, SparkContext}
+
+import scala.collection.immutable.HashMap
 //import TimeSeriesUtils.DoubleOps
 
 import org.scalatest.{FunSuite, ShouldMatchers}
