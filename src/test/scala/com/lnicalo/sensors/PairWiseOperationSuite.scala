@@ -65,8 +65,9 @@ class PairWiseOperationSuite extends FunSuite with ShouldMatchers {
     val v = List((1.0,1), (2.0,2), (3.0, 4), (4.0,6), (5.0,8), (10.0,8))
     val filter = List((1.5,true), (1.9,false), (3.0,true), (3.5,false), (5.0,true))
     val out = Signal.PairWiseFilter(v, filter)
-    val test_out = List((1.5,Some(1)), (1.9,None), (2.0,None), (3.0,Some(4)),
-      (3.5,None), (4.0,None), (5.0,Some(8)), (10.0,Some(8)))
+    val test_out = List((1.5,Some(1)), (1.9,None), (3.0,Some(4)),
+      (3.5,None), (5.0,Some(8)), (10.0,Some(8)))
+
     out should be (test_out)
   }
 
@@ -74,8 +75,9 @@ class PairWiseOperationSuite extends FunSuite with ShouldMatchers {
     val v = List((1.0,1), (2.0,2), (3.0,4), (4.0,6), (4.9,8), (10.0,8))
     val filter = List((1.5,true), (1.9,false), (3.0,true), (3.5,true), (5.0,false))
     val out = Signal.PairWiseFilter(v, filter)
-    val test_out = List((1.5,Some(1)), (1.9,None), (2.0,None), (3.0,Some(4)), (3.5,Some(4)),
+    val test_out = List((1.5,Some(1)), (1.9,None), (3.0,Some(4)),
       (4.0,Some(6)), (4.9,Some(8)), (5.0,None), (10.0,None))
+
     out should be (test_out)
   }
 

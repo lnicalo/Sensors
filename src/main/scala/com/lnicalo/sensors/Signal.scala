@@ -179,16 +179,31 @@ object Signal {
       else {
         val d = w.head
         val e = v.head
+        val new_val = f(e._2, d._2)
         if (d._1 == e._1) {
-          val s = (d._1, f(e._2, d._2))
-          recursive(v.tail, w.tail, s :: acc)
+          val s = (d._1, new_val)
+          recursive(v.tail, w.tail, updateAcc(acc, s))
         }
         else if (d._1 > e._1) {
-          val s = (d._1, f(e._2, d._2))
-          recursive(v, w.tail, s :: acc)
+          val s = (d._1, new_val)
+          recursive(v, w.tail, updateAcc(acc, s))
         } else {
-          val s = (e._1, f(e._2, d._2))
-          recursive(v.tail, w, s :: acc)
+          val s = (e._1, new_val)
+          recursive(v.tail, w, updateAcc(acc, s))
+        }
+      }
+    }
+
+    def updateAcc(acc: Series[O], s: (Double, Value[O])) = {
+      if (acc.length < 2) {
+        s :: acc
+      } else {
+        val old_value = acc.head._2
+        if (s._2 != old_value) {
+          s :: acc
+        }
+        else {
+          s :: acc.tail
         }
       }
     }
