@@ -2,9 +2,6 @@ package com.lnicalo.sensors
 
 import scala.reflect.ClassTag
 
-/**
-  * Created by LNICOLAS on 01/12/2016.
-  */
 class StringSignalFunctions[K: ClassTag] (self: Signal[K, String])
   extends Serializable {
 

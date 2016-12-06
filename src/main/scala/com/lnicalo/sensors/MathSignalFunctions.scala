@@ -3,9 +3,6 @@ package com.lnicalo.sensors
 import scala.collection.immutable.HashMap
 import scala.reflect.ClassTag
 
-/**
-  * Created by LNICOLAS on 01/12/2016.
-  */
 class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K, V])
   extends Serializable {
 
@@ -118,36 +115,51 @@ class MathSignalFunctions[K: ClassTag, V : Fractional: ClassTag] (self: Signal[K
   }
 
 
-  def avg(): Signal[K,V] = self // .addOp(MathSignalFunctions.avg[V])
+  def avg(): Signal[K,V] = self.addOp(MathSignalFunctions.avg[V])
 
-  def area(): Signal[K,V] = self // .addOp(MathSignalFunctions.area[V])
+  def area(): Signal[K,V] = self.addOp(MathSignalFunctions.area[V])
 
   def span(): Signal[K,V] = self.addOp(MathSignalFunctions.span[V])
 }
 
 object MathSignalFunctions {
   def span[V: Fractional](x: Series[V]): HashMap[String, Option[V]] = {
+    // Filter all nones out
     val tmp = x.filter({case (t, Some(x)) => true case _ => false})
+
     (tmp.headOption, tmp.lastOption) match {
       case (Some((_, Some(first))), Some((_, Some(last)))) =>
-        HashMap[String, Option[V]]("First" -> Option(first),
-          "Last" -> Option(last),
-          "Span" -> Option(implicitly[Fractional[V]] minus (last, first)))
-      case _ => HashMap[String, Option[V]]("First" -> None,
-        "Last" -> None, "Span" -> None)
+        HashMap[String, Option[V]]("Span" -> Option(implicitly[Fractional[V]] minus (last, first)))
+      case _ => HashMap[String, Option[V]]("Span" -> None)
     }
   }
 
-  def avg[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val avg = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 } /
-      y.foldLeft(0.0) { (a, b) => a + b._2 }
-    HashMap[String, Double]("Avg" -> avg)
+  def avg[V: Fractional](x: Series[V]): HashMap[String, Option[Double]] = {
+    val (total, total_w) = x.sliding(2).map(slide => (slide.head._2, slide.last._1 - slide.head._1))
+      .foldLeft((0.0, 0.0)) {
+        case ((sum, acc_w), (Some(v), w)) =>
+          (implicitly[Fractional[V]].toDouble(v) * w + sum, acc_w + w)
+        case (acc, _) => acc
+      }
+    total_w match {
+      case 0 => HashMap[String, Option[Double]]("Avg" -> None)
+      case _ => HashMap[String, Option[Double]]("Avg" -> Some(total / total_w))
+    }
   }
 
-  def area[V: Fractional](x: List[(Double, V)]): HashMap[String, Double] = {
-    val y = x.sliding(2).map(h => (h.head._2, h.last._1 - h.head._1)).toList
-    val area = y.foldLeft(0.0) { (a, b) => a + implicitly[Fractional[V]].toDouble(b._1) * b._2 }
-    HashMap[String, Double]("Area" -> area)
+  def area[V: Fractional](x: Series[V]): HashMap[String, Option[Double]] = {
+    val acc: Option[Double] = None
+    val dbg = x.sliding(2)
+      .map(slide => (slide.head._2, slide.last._1 - slide.head._1)).toList
+
+    val total = dbg.foldLeft(acc) {
+        case (None, (Some(v), w)) =>
+          Some(implicitly[Fractional[V]].toDouble(v) * w)
+        case (Some(current_acc), (Some(v), w)) =>
+          Some(implicitly[Fractional[V]].toDouble(v) * w + current_acc)
+        case (current_acc, _) =>
+          current_acc
+      }
+    HashMap[String, Option[Double]]("Area" -> total)
   }
 }

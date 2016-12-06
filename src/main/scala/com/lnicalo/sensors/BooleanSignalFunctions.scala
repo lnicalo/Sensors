@@ -1,8 +1,5 @@
 package com.lnicalo.sensors
 
-import org.apache.spark.{Partition, SparkContext, TaskContext}
-import org.apache.spark.rdd.RDD
-
 import scala.reflect.ClassTag
 
 class BooleanSignalFunctions[K: ClassTag](self: Signal[K, Boolean])

@@ -133,18 +133,60 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     output("2") should be (toSeries(List((10.0, false), (20.0, false), (30.0, false))))
   }
 
-  test("filter by other signal") {
+  test("operations without filter") {
+    val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
+    sc = new SparkContext(conf)
+
+    val signal = Signal(Array(
+      ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
+      ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
+    val output = signal
+      .lastValue()
+      .firstValue()
+      .start()
+      .end()
+      .duration()
+      .avg()
+      .span()
+      .area()
+      .toDataset
+
+    output("1") should be (HashMap("Area" -> Some(3.0), "Duration" -> Some(2.0),
+      "Span" -> Some(2.0), "Start" -> Some(1.0), "Avg" -> Some(1.5),
+      "Last" -> Some(3.0), "End" -> Some(3.0), "First" -> Some(1.0)))
+    output("2") should be (HashMap("Area" -> Some(300.0), "Duration" -> Some(20.0),
+      "Span" -> Some(20.0), "Start" -> Some(10.0), "Avg" -> Some(15.0),
+      "Last" -> Some(30.0), "End" -> Some(30.0), "First" -> Some(10.0)))
+  }
+
+  test("operations with filter") {
     val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
     sc = new SparkContext(conf)
 
     val signal1 = Signal(Array(
-      ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
-      ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
+      ("1", List((1.0, 1.0), (2.0, 0.25), (3.0, 3.0))),
+      ("2", List((10.0, 10.0), (15.0, 20.0), (30.0, 30.0))) ))
     val signal2 = Signal(Array(
-      ("1", List((1.5, 1.5), (2.5, 2.0), (3.5, 3.5))),
-      ("2", List((10.5, 10.5), (20.5, 1.5), (30.5, -30.5))) ))
+      ("1", List((1.5, 2.0), (1.75, 0.5), (2.5, 0.0))),
+      ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
+    val output = signal1
+      .where(signal1 > signal2)
+      .lastValue()
+      .firstValue()
+      .start()
+      .end()
+      .duration()
+      .avg()
+      .span()
+      .area()
+      .toDataset
 
-    //val output = signal1.where(signal2 >= 2).collectAsMap()
-    // output
+    output("1") should be (HashMap("Area" -> Some(0.375), "Duration" -> Some(0.75),
+      "Span" -> Some(2.0), "Start" -> Some(1.75), "Avg" -> Some(0.5),
+      "Last" -> Some(3.0), "End" -> Some(3.0), "First" -> Some(1.0)))
+
+    output("2") should be (HashMap("Area" -> Some(100.0), "Duration" -> Some(5.0),
+      "Span" -> Some(0.0), "Start" -> Some(15.0), "Avg" -> Some(20.0),
+      "Last" -> Some(20.0), "End" -> Some(20.0), "First" -> Some(20.0)))
   }
 }

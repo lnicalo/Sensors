@@ -8,7 +8,7 @@ import org.scalatest.{FunSuite, ShouldMatchers}
 
 import scala.collection.mutable.ArrayBuffer
 
-class TimeSeriesUtilsSuite extends FunSuite with ShouldMatchers {
+class PairWiseOperationSuite extends FunSuite with ShouldMatchers {
   test("PairWiseOperation - product") {
     val v = List((1.0,1), (2.0,2), (3.0,4), (4.0,6))
     val w = List((1.5,1), (2.5,3), (3.5,5), (4.5, 7))

@@ -1,8 +1,5 @@
 package com.lnicalo
 
-/**
-  * Created by LNICOLAS on 05/12/2016.
-  */
 package object sensors {
   type Value[V] = Option[V]
   type Series[V] = List[(Double, Option[V])]

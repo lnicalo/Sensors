@@ -71,11 +71,15 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
   }
 
   // Operations
+  def start() = this.addOp(Signal.start)
+
+  def end() = this.addOp(Signal.end)
+
   def duration() = this.addOp(Signal.duration)
 
-  def lastValue(): Signal[K,V] = this.addOp(Signal.last)
+  def lastValue(): Signal[K,V] = this.addOp(Signal.lastValue)
 
-  def firstValue(): Signal[K,V] = this.addOp(Signal.first)
+  def firstValue(): Signal[K,V] = this.addOp(Signal.firstValue)
 
   def addOp(f: Ops): Signal[K, V] = {
     this.ops ::= f
@@ -121,8 +125,10 @@ object Signal {
   def start[V](x: Series[V]): HashMap[String, Option[Double]] = {
     val tmp = x.filter({ case (_, Some(_)) => true case _ => false })
     tmp.headOption match {
-      case Some((startTime, _)) => HashMap[String, Option[Double]]("Start" -> Some(startTime))
-      case _ => HashMap[String, Option[Double]]("Start" -> None)
+      case Some((startTime, _)) =>
+        HashMap[String, Option[Double]]("Start" -> Some(startTime))
+      case _ =>
+        HashMap[String, Option[Double]]("Start" -> None)
     }
   }
 
@@ -130,8 +136,10 @@ object Signal {
     val tmp = x.sliding(2).map(h => (h.last._1, h.head._2))
       .filter({ case (_, Some(x)) => true case _ => false })
     tmp.toList.lastOption match {
-      case Some((endTime, _)) => HashMap[String, Option[Double]]("End" -> Some(endTime))
-      case _ => HashMap[String, Option[Double]]("End" -> None)
+      case Some((endTime, _)) =>
+        HashMap[String, Option[Double]]("End" -> Some(endTime))
+      case _ =>
+        HashMap[String, Option[Double]]("End" -> None)
     }
   }
 
@@ -142,17 +150,17 @@ object Signal {
     HashMap[String, Some[Double]]("Duration" -> Some(duration))
   }
 
-  def last[V](x: Series[V]): HashMap[String, Option[V]] = {
+  def lastValue[V](x: Series[V]): HashMap[String, Option[V]] = {
     val tmp = x.filter({case (t, Some(x)) => true case _ => false})
     (tmp.lastOption) match {
-      case Some((_, lastValue)) => HashMap("Last" -> lastValue)
+      case Some((_, value)) => HashMap("Last" -> value)
       case _ => HashMap("Last" -> None)
     }
   }
 
-  def first[V](x: Series[V]): HashMap[String, Option[V]] =  {
-    (x.headOption) match {
-      case Some((_, firstValue)) => HashMap("First" -> firstValue)
+  def firstValue[V](x: Series[V]): HashMap[String, Option[V]] =  {
+    (x.find({case (_, Some(_)) => true case _ => false})) match {
+      case Some((_, value)) => HashMap("First" -> value)
       case _ => HashMap("First" -> None)
     }
   }
