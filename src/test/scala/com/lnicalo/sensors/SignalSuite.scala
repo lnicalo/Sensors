@@ -35,7 +35,8 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     val signal2 = Signal(Array(
       ("1", List((1.5, "on"), (2.5, "off"), (3.5, "off"))),
       ("2", List((10.5, "on"), (20.5, "off"), (30.5, "on"))) ))
-
+    val d1 = signal1.collect()
+    val d2 = signal2.collect()
     val output = (signal1 |==| signal2).collectAsMap()
     output("1") should be (toSeries(List((1.5, false), (2.0, true), (2.5, false), (3.5, false))))
     output("2") should be (toSeries(List((10.5, false), (20.0, true), (20.5, false), (30.0, true), (30.5, false))))
@@ -188,5 +189,41 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     output("2") should be (HashMap("Area" -> Some(100.0), "Duration" -> Some(5.0),
       "Span" -> Some(0.0), "Start" -> Some(15.0), "Avg" -> Some(20.0),
       "Last" -> Some(20.0), "End" -> Some(20.0), "First" -> Some(20.0)))
+  }
+
+  test("split by") {
+    val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
+    sc = new SparkContext(conf)
+
+    val signal1 = Signal(Array(
+      ("1", List((1.0, 1.0), (2.0, 0.25), (3.0, 3.0))),
+      ("2", List((10.0, 10.0), (15.0, 20.0), (30.0, 30.0))) ))
+    val signal2 = Signal(Array(
+      ("1", List((1.5, 2.0), (1.75, 0.5), (2.5, 0.0))),
+      ("2", List((9.0, 12.0), (20.0, 20.0), (25.0, 30.0))) ))
+
+    val output = signal1
+      .binBy(signal1 > signal2)
+      .lastValue()
+      .firstValue()
+      .start()
+      .end()
+      .toDataset
+
+    output(("1", true)) should be (
+      Map("Start" -> Some(1.75), "Last" -> Some(3.0), "End" -> Some(3.0), "First" -> Some(1.0))
+    )
+
+    output(("1", false)) should be (
+      Map("Start" -> Some(1.5), "Last" -> Some(0.25), "End" -> Some(2.5), "First" -> Some(1.0))
+    )
+
+    output(("2", true)) should be (
+      Map("Start" -> Some(15.0), "Last" -> Some(20.0), "End" -> Some(20.0), "First" -> Some(20.0))
+    )
+
+    output(("2", false)) should be (
+      Map("Start" -> Some(10.0), "Last" -> Some(30.0), "End" -> Some(30.0), "First" -> Some(10.0))
+    )
   }
 }

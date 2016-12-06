@@ -70,6 +70,15 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
     })
   }
 
+  // Filter
+  def binBy[W](that: Signal[K, W]): Signal[(K, W), V] = {
+    val o = parent.join(that).flatMap ({
+      case (key, (v, filter)) =>
+        Signal.SplitOperation(v, filter).map({ case (k, ss) => ((key, k), ss)})
+    })
+    new Signal(o)
+  }
+
   // Operations
   def start() = this.addOp(Signal.start)
 
@@ -165,12 +174,93 @@ object Signal {
     }
   }
 
+  def SplitOperation[A,B](v: Series[A], splitter: Series[B]): HashMap[B, Series[A]] = {
+    def updateAcc[V](acc: Series[V], s: (Double, Value[V])) = {
+      if (acc.length < 1) {
+        s :: acc
+      } else {
+        val old_value = acc.head._2
+        if (s._2 != old_value) {
+          s :: acc
+        }
+        else {
+          s :: acc.tail
+        }
+      }
+    }
 
+    @tailrec
+    def recursive(series: Series[A],
+                  splitter: Series[B],
+                  acc: HashMap[B, Series[A]]): HashMap[B, Series[A]] = {
+      (series, splitter) match {
+        case ((sample_t, sample_v) :: series_tail,
+        (split_t, Some(split_v)) :: split_tail) =>
+          if (sample_t == split_t) {
+            val tmp = updateAcc(acc.getOrElse(split_v, List((split_t, None))),
+              (split_t, sample_v))
+            split_tail.headOption match {
+              case Some((split_t2, Some(split_v2))) if (split_v2 != split_v) =>
+                var tmp2 = updateAcc(acc.getOrElse(split_v2, List((split_t, None))),
+                  (split_t, None))
+                tmp2 = updateAcc(tmp2, (split_t, sample_v)  )
+                recursive(series_tail, split_tail, acc.updated(split_v, tmp).updated(split_v2, tmp2))
+              case _ =>
+                recursive(series_tail, split_tail, acc.updated(split_v, tmp))
+            }
+          }
+          else if (split_t > sample_t) {
+            val tmp = updateAcc(acc.getOrElse(split_v, List((split_t, None))),
+              (split_t, sample_v))
 
-  def PairWiseOperation[A,B,O](v: Series[A],
-                               w: Series[B])
+            split_tail.headOption match {
+              case Some((split_t2, Some(split_v2))) if (split_v2 != split_v) =>
+                var tmp2 = updateAcc(acc.getOrElse(split_v2, List((split_t, None))),
+                  (split_t, None))
+                tmp2 = updateAcc(tmp2, (split_t, sample_v)  )
+                recursive(series, split_tail, acc.updated(split_v, tmp).updated(split_v2, tmp2))
+              case _ =>
+                recursive(series, split_tail, acc.updated(split_v, tmp))
+            }
+          }
+          else {
+            val tmp = updateAcc(acc.getOrElse(split_v, List((sample_t, None))),
+              (sample_t, sample_v))
+            recursive(series_tail, splitter, acc.updated(split_v, tmp))
+          }
+        case ((sample_t, None) :: series_tail,
+        (split_t, _) :: split_tail) =>
+          if (sample_t > split_t) recursive(series_tail, splitter, acc)
+          // else if (sample_t == split_t) recursive(series_tail, split_tail, acc)
+          else recursive(series, split_tail, acc)
+        case ((sample_t, _) :: series_tail,
+        (split_t, None) :: split_tail) =>
+          if (sample_t > split_t) recursive(series_tail, splitter, acc)
+          // else if (sample_t == split_t) recursive(series_tail, split_tail, acc)
+          else recursive(series, split_tail, acc)
+        case _ => acc
+      }
+    }
+    recursive(v.reverse, splitter.reverse, HashMap[B, Series[A]]())
+  }
+
+  def PairWiseOperation[A,B,O](v: Series[A], w: Series[B])
                               (f: (Value[A],Value[B]) => Value[O]):
   Series[O] = {
+    def updateAcc[V](acc: Series[V], s: (Double, Value[V])) = {
+      if (acc.length < 2) {
+        s :: acc
+      } else {
+        val old_value = acc.head._2
+        if (s._2 != old_value) {
+          s :: acc
+        }
+        else {
+          s :: acc.tail
+        }
+      }
+    }
+
     @tailrec
     def recursive(v: Series[A],
                   w: Series[B],
@@ -193,22 +283,10 @@ object Signal {
         }
       }
     }
-
-    def updateAcc(acc: Series[O], s: (Double, Value[O])) = {
-      if (acc.length < 2) {
-        s :: acc
-      } else {
-        val old_value = acc.head._2
-        if (s._2 != old_value) {
-          s :: acc
-        }
-        else {
-          s :: acc.tail
-        }
-      }
-    }
     recursive(v.reverse, w.reverse, Nil)
   }
+
+
 
   def PairWiseFilter[A](v: Series[A], filter: Series[Boolean]): Series[A] =
     Signal.PairWiseOperation(v, filter)((a,b) => if (b.getOrElse(false)) a else None)
@@ -225,10 +303,8 @@ object Signal {
   def apply[K: ClassTag, V: ClassTag](local: Array[(K, List[(Double, V)])])
                                                  (implicit sc: SparkContext) =
     new Signal[K, V](sc.parallelize(local.map {
-      case (a, b) => (a, b.map {
-        case (t, v) => (t, Option(v))
-      })
-    } ))
+      case (a, b) => (a, toSeries(b))
+      }))
 
   def apply[K: ClassTag, V: ClassTag](rdd: RDD[(K, Series[V])]) =
     new Signal[K,V](rdd)
