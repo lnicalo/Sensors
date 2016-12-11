@@ -5,8 +5,11 @@ import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
+import scala.collection.mutable.Map
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 import scala.util.Random
+import scala.util.control.Breaks._
 
 class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
   extends RDD[(K, Series[V])](parent) {
@@ -74,7 +77,7 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
   def binBy[W](that: Signal[K, W]): Signal[(K, W), V] = {
     val o = parent.join(that).flatMap ({
       case (key, (v, filter)) =>
-        Signal.SplitOperation(v, filter).map({ case (k, ss) => ((key, k), ss)})
+        Signal.BinOperation(v, filter).map({ case (k, ss) => ((key, k), ss)})
     })
     new Signal(o)
   }
@@ -174,74 +177,83 @@ object Signal {
     }
   }
 
-  def SplitOperation[A,B](v: Series[A], splitter: Series[B]): HashMap[B, Series[A]] = {
-    def updateAcc[V](acc: Series[V], s: (Double, Value[V])) = {
-      if (acc.length < 1) {
-        s :: acc
-      } else {
-        val old_value = acc.head._2
-        if (s._2 != old_value) {
-          s :: acc
-        }
-        else {
-          s :: acc.tail
-        }
+  def SplitOperation[A,B](series: Series[A], splitter: Series[B]):
+    List[((Double, Double), Series[A])] = {
+    require(!series.isEmpty && !splitter.isEmpty)
+
+    val out = ListBuffer[((Double, Double), Series[A])]()
+    // val series_it = series.sliding(2)
+
+    for (slice <- splitter.sliding(2)) {
+      val sub_series = ListBuffer[(Double, Option[A])] ()
+      (slice(0), slice(1)) match {
+        case ((t1, Some(_)), (t2, _)) =>
+          for (series_slice <- series.sliding(2)) {
+            val (tv1, v1) = series_slice(0)
+            val (tv2, v2) = series_slice(1)
+
+            if (tv1 < t1 && tv2 > t1 && tv2 < t2) {
+              sub_series.append((t1, v1))
+            } else if (tv1 > t1 && tv2 > t1 && tv2 < t2) {
+              sub_series.append((tv1, v1))
+            } else if (tv1 > t1 && tv1 < t2 && tv2 > t2) {
+              sub_series.append((tv1, v1), (t2, None))
+            }
+          }
+          out.append(((sub_series(0)._1, sub_series.last._1), sub_series.toList))
       }
+    }
+    out.toList
+  }
+
+  def BinOperation[A,B](v: Series[A], splitter: Series[B]): Map[B, Series[A]] = {
+    def appendToSeries[V](acc: Series[V], samples: (Double, Value[V])*): Series[V] = {
+      var out = acc
+      for (s <- samples) {
+        out = if (acc.length < 1 || s._2 != acc.head._2) s :: out
+        else s :: out.tail
+      }
+      out
     }
 
     @tailrec
-    def recursive(series: Series[A],
-                  splitter: Series[B],
-                  acc: HashMap[B, Series[A]]): HashMap[B, Series[A]] = {
+    def recursive(series: Series[A], splitter: Series[B],
+                  acc: Map[B, Series[A]]): Map[B, Series[A]] = {
+
       (series, splitter) match {
-        case ((sample_t, sample_v) :: series_tail,
-        (split_t, Some(split_v)) :: split_tail) =>
-          if (sample_t == split_t) {
-            val tmp = updateAcc(acc.getOrElse(split_v, List((split_t, None))),
-              (split_t, sample_v))
-            split_tail.headOption match {
-              case Some((split_t2, Some(split_v2))) if (split_v2 != split_v) =>
-                var tmp2 = updateAcc(acc.getOrElse(split_v2, List((split_t, None))),
-                  (split_t, None))
-                tmp2 = updateAcc(tmp2, (split_t, sample_v)  )
-                recursive(series_tail, split_tail, acc.updated(split_v, tmp).updated(split_v2, tmp2))
-              case _ =>
-                recursive(series_tail, split_tail, acc.updated(split_v, tmp))
-            }
-          }
-          else if (split_t > sample_t) {
-            val tmp = updateAcc(acc.getOrElse(split_v, List((split_t, None))),
-              (split_t, sample_v))
+
+        case ((sample_t, sample_v) :: series_tail, (split_t, Some(split_v)) :: split_tail) =>
+          if (sample_t <= split_t) {
+            val tmp = appendToSeries(
+              acc.getOrElse(split_v, List((split_t, None))), (split_t, sample_v))
 
             split_tail.headOption match {
               case Some((split_t2, Some(split_v2))) if (split_v2 != split_v) =>
-                var tmp2 = updateAcc(acc.getOrElse(split_v2, List((split_t, None))),
-                  (split_t, None))
-                tmp2 = updateAcc(tmp2, (split_t, sample_v)  )
-                recursive(series, split_tail, acc.updated(split_v, tmp).updated(split_v2, tmp2))
+                val tmp2 = appendToSeries(
+                  acc.getOrElse(split_v2, List((split_t, None))),
+                  (split_t, None), (split_t, sample_v))
+                acc += ((split_v -> tmp), (split_v2 -> tmp2))
               case _ =>
-                recursive(series, split_tail, acc.updated(split_v, tmp))
+                acc += (split_v -> tmp)
             }
+            if (sample_t == split_t) recursive(series_tail, split_tail, acc)
+            else recursive(series, split_tail, acc)
           }
           else {
-            val tmp = updateAcc(acc.getOrElse(split_v, List((sample_t, None))),
+            val tmp = appendToSeries(
+              acc.getOrElse(split_v, List((sample_t, None))),
               (sample_t, sample_v))
-            recursive(series_tail, splitter, acc.updated(split_v, tmp))
+            recursive(series_tail, splitter, acc +=(split_v -> tmp))
           }
-        case ((sample_t, None) :: series_tail,
-        (split_t, _) :: split_tail) =>
+
+        case ((sample_t, _) :: series_tail, (split_t, _) :: split_tail) =>
           if (sample_t > split_t) recursive(series_tail, splitter, acc)
-          // else if (sample_t == split_t) recursive(series_tail, split_tail, acc)
           else recursive(series, split_tail, acc)
-        case ((sample_t, _) :: series_tail,
-        (split_t, None) :: split_tail) =>
-          if (sample_t > split_t) recursive(series_tail, splitter, acc)
-          // else if (sample_t == split_t) recursive(series_tail, split_tail, acc)
-          else recursive(series, split_tail, acc)
+
         case _ => acc
       }
     }
-    recursive(v.reverse, splitter.reverse, HashMap[B, Series[A]]())
+    recursive(v.reverse, splitter.reverse, Map[B, Series[A]]())
   }
 
   def PairWiseOperation[A,B,O](v: Series[A], w: Series[B])
