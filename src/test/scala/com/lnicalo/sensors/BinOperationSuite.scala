@@ -13,9 +13,6 @@ class BinOperationSuite extends FunSuite with ShouldMatchers {
       1 -> List((1.5,Some(1)), (2.0,Some(2)), (2.5,None)),
       3 -> List((2.5,Some(2)), (3.0,Some(4)), (3.5,None)))
     out should be (test_out)
-    Map(5 -> List((3.5,Some(4)), (3.5,None)),
-      1 -> List((1.5,Some(1)), (2.0,Some(2)), (2.5,None)),
-      3 -> List((2.5,Some(2)), (3.0,Some(4)), (3.5,None)))
   }
 
   test("Bin operation - tails") {

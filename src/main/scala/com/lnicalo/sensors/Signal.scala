@@ -5,11 +5,9 @@ import org.apache.spark.{Partition, SparkContext, TaskContext}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
-import scala.collection.mutable.Map
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ListBuffer, Map}
 import scala.reflect.ClassTag
 import scala.util.Random
-import scala.util.control.Breaks._
 
 class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
   extends RDD[(K, Series[V])](parent) {
@@ -69,15 +67,24 @@ class Signal[K: ClassTag, V : ClassTag](val parent: RDD[(K, Series[V])])
   // Filter
   def where(that: Signal[K, Boolean]): Signal[K, V] = {
     new Signal(parent.join(that).mapValues {
-      case (v, filter) => Signal.PairWiseFilter(v, filter)
+      case (v, filter) =>
+        Signal.PairWiseFilter(v, filter)
     })
   }
 
-  // Filter
+  // Bin
   def binBy[W](that: Signal[K, W]): Signal[(K, W), V] = {
     val o = parent.join(that).flatMap ({
       case (key, (v, filter)) =>
         Signal.BinOperation(v, filter).map({ case (k, ss) => ((key, k), ss)})
+    })
+    new Signal(o)
+  }
+
+  def splitBy[W](that: Signal[K, W]): Signal[(K, (Double, Double)), V] = {
+    val o = parent.join(that).flatMap ({
+      case (key, (v, filter)) =>
+        Signal.SplitOperation(v, filter).map({ case (k, ss) => ((key, k), ss.toList)})
     })
     new Signal(o)
   }
@@ -178,32 +185,80 @@ object Signal {
   }
 
   def SplitOperation[A,B](series: Series[A], splitter: Series[B]):
-    List[((Double, Double), Series[A])] = {
-    require(!series.isEmpty && !splitter.isEmpty)
-
-    val out = ListBuffer[((Double, Double), Series[A])]()
-    // val series_it = series.sliding(2)
-
-    for (slice <- splitter.sliding(2)) {
-      val sub_series = ListBuffer[(Double, Option[A])] ()
-      (slice(0), slice(1)) match {
-        case ((t1, Some(_)), (t2, _)) =>
-          for (series_slice <- series.sliding(2)) {
-            val (tv1, v1) = series_slice(0)
-            val (tv2, v2) = series_slice(1)
-
-            if (tv1 < t1 && tv2 > t1 && tv2 < t2) {
-              sub_series.append((t1, v1))
-            } else if (tv1 > t1 && tv2 > t1 && tv2 < t2) {
-              sub_series.append((tv1, v1))
-            } else if (tv1 > t1 && tv1 < t2 && tv2 > t2) {
-              sub_series.append((tv1, v1), (t2, None))
-            }
+  List[((Double, Double), SeriesBuffer[A])] = {
+    def splitBySeparator[T]( l: Series[T]): ListBuffer[SeriesBuffer[T]] = {
+      val b = ListBuffer(ListBuffer[(Double, Option[T])]())
+      l foreach {
+        sample => sample match {
+          case (time, Some(value)) => b.last += sample
+          case _ => if  ( !b.last.isEmpty ) {
+            b.last += sample
+            b += ListBuffer[(Double, Option[T])]()
           }
-          out.append(((sub_series(0)._1, sub_series.last._1), sub_series.toList))
+        }
+      }
+      b
+    }
+
+    val tmp = BinOperation[A,B](series, splitter)
+    val b = ListBuffer(ListBuffer[(Double, Option[A])]())
+    for ((key, key_series) <- tmp) {
+      b ++= splitBySeparator(key_series)
+    }
+    b.filter(_.length > 0)
+      .map(series => ((series.head._1, series.last._1), series))
+      .toList
+  }
+
+  def SplitOperation2[A,B](series: Series[A], splitter: Series[B]):
+    List[(B, SeriesBuffer[A])] = {
+    def appendToSeries[V](acc: SeriesBuffer[V], samples: (Double, Value[V])*): SeriesBuffer[V] = {
+      var out = acc
+      for (s <- samples) {
+        if (acc.length < 1 || s._2 != acc.head._2) out += s
+        else out(out.length-1) = s
+      }
+      out
+    }
+
+    @tailrec
+    def recursive(series: Series[A], splitter: Series[B],
+                  acc: ListBuffer[(B, SeriesBuffer[A])]): ListBuffer[(B, SeriesBuffer[A])] = {
+
+      (series, splitter) match {
+
+        case ((sample_t, sample_v) :: series_tail, (split_t, Some(split_v)) :: split_tail) =>
+          if (sample_t <= split_t) {
+            val tmp = appendToSeries(
+              acc.headOption.getOrElse((split_v, ListBuffer[(Double, Value[A])]((split_t, None))))._2,
+              (split_t, sample_v))
+            split_tail.headOption match {
+              case Some((split_t2, Some(split_v2))) if (split_v2 != split_v) =>
+                val tmp2 = appendToSeries(
+                  acc.headOption.getOrElse((split_v, ListBuffer[(Double, Value[A])]((split_t, None))))._2,
+                  (split_t, None), (split_t, sample_v))
+                acc.append((split_v,tmp), (split_v2,tmp2))
+              case _ =>
+                acc.append((split_v, tmp))
+            }
+            if (sample_t == split_t) recursive(series_tail, split_tail, acc)
+            else recursive(series, split_tail, acc)
+          }
+          else {
+            val tmp = appendToSeries(
+              acc.headOption.getOrElse(split_v, ListBuffer[(Double, Value[A])]((sample_t, None)))._2,
+              (sample_t, sample_v))
+            recursive(series_tail, splitter, acc +=(split_v -> tmp))
+          }
+
+        case ((sample_t, _) :: series_tail, (split_t, _) :: split_tail) =>
+          if (sample_t > split_t) recursive(series_tail, splitter, acc)
+          else recursive(series, split_tail, acc)
+
+        case _ => acc
       }
     }
-    out.toList
+    recursive(series.reverse, splitter.reverse, ListBuffer[(B, SeriesBuffer[A])]()).toList
   }
 
   def BinOperation[A,B](v: Series[A], splitter: Series[B]): Map[B, Series[A]] = {
