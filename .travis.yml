@@ -5,7 +5,3 @@ scala:
 branches:
   only:
     - master
-notifications:
-  email:
-    recipients:
-- prasinous@gmail.com
