@@ -1,3 +1,9 @@
+import scoverage.ScoverageSbtPlugin
+
+import scalariform.formatter.preferences._
+import com.typesafe.sbt.SbtScalariform.ScalariformKeys
+import com.typesafe.sbt.SbtScalariform.scalariformSettings
+
 name := "Sensors"
 
 version := "1.0"
@@ -15,3 +21,18 @@ libraryDependencies ++= Seq(
 )
 
 resolvers += "Apache Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots"
+
+CoverallsPlugin.coverallsSettings
+
+ScoverageSbtPlugin.ScoverageKeys.coverageMinimum := 80
+
+ScoverageSbtPlugin.ScoverageKeys.coverageFailOnMinimum := true
+
+scalariformSettings ++ Seq(
+    ScalariformKeys.preferences := ScalariformKeys.preferences.value
+      .setPreference(AlignSingleLineCaseStatements, true)
+      .setPreference(DoubleIndentClassDeclaration, true)
+      .setPreference(PreserveDanglingCloseParenthesis, true)
+      .setPreference(PreserveSpaceBeforeArguments, true)
+      .setPreference(RewriteArrowSymbols, true)
+)
