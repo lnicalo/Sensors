@@ -1,3 +1,6 @@
+dist: trusty
+sudo: required
+
 language: scala
 scala:
    - 2.11.8
@@ -5,4 +8,21 @@ branches:
   only:
     - master
     
-script: "sbt coverage test coveralls"
+script: 
+ - sbt coverage test coveralls
+ - sonar-scanner
+
+addons:
+  sonarqube:
+    token:
+      secure: "MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwr+lQwofYp8Yu62gzzv7 HKSTVv7fPx9ZRc9erdgeEnmPlHTRT39QBpVc88W6Q8uPP2BHJBZvZTRlyoyhyTj6 2OSjthYmmz51go5S5o5HBRjOxn2zF5AXVqP377XQUe6h2Jyfic98o0lD3UjlRvRB oY6Nb+E9hb52hhzjlB4+p1H86bVdL0hth3n13i/9/Ya8mmUv5qhjP+QUj+XUjhbV D6Bm+b+e39Pbnz944S0lCQM0k3+MKpzq+6vS415QYHMU7LiNGL/O11tTxBRdx6Gi OdeyRyyfyY94R1Im9sqI2VcIrhRalbMenh5gfFnGQ9VFqiVqfwTaR/gljPknvMmm Jc1mRWFR7Jr0l0tlQs36MYEw4HrsGf6RpRFsp9XR8lrQvSR2097Gon9QkCWSOUX6 CYax/ch8nhYzu7/wfg627bTI+DKQJ3OGzcUFPaUdZC6SqACpj9nlmHmPEjf20kQx 4XRxBjdRFZgJPzcqbJ+X4qXG1EVGRI2hgWyzP9c3FXd2kvb1UUtuG/pwSyjnObkX TYFHhQrKDJLIkNhfluoMISXBG+kkqJ8Nruxv3iPJtSyzv1c/AzGFMlg/QlWQEZXB NLTdyP/punaN2CAIuD8i9yxAkjupl45d1vfViR+19fZmv4NchMmBjncTopWR53iL lf48ylKf66AhU8HuVoxkUYMCAwEAAQ=="
+
+jdk:
+  - oraclejdk8
+
+cache:
+  directories:
+- '$HOME/.sonar/cache'
+
+notifications:
+  email: false
