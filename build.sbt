@@ -16,6 +16,8 @@ libraryDependencies ++= Seq(
 
 resolvers += "Apache Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots"
 
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.3.5")
+// Plugin for scoverage:
+addSbtPlugin("org.scoverage" %% "sbt-scoverage" % "1.0.4")
 
-addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.1.0")
+// Plugin for publishing scoverage results to coveralls:
+addSbtPlugin("com.sksamuel.scoverage" %% "sbt-coveralls" % "0.0.5")
