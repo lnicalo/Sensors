@@ -20,7 +20,7 @@ dependencies:
 
 script: 
  - sbt coverage test coveralls
- - ./run-sonar.sh run
+ - sonar-scanner
 
 addons:
   sonarqube:
