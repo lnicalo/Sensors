@@ -22,7 +22,7 @@ jdk:
 
 cache:
   directories:
-- '$HOME/.sonar/cache'
+    - '$HOME/.sonar/cache'
 
 notifications:
   email: false
