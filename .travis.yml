@@ -7,10 +7,20 @@ scala:
 branches:
   only:
     - master
-    
+
+dependencies:
+  override:
+    - wget https://raw.githubusercontent.com/Sagacify/ci-tools/master/run-sonar.sh
+    - chmod +x run-sonar.sh
+    - ./run-sonar.sh check
+    - ./run-sonar.sh install
+  cache_directories:
+    - "~/.ivy2"
+    - "~/.sbt"
+
 script: 
  - sbt coverage test coveralls
- - sonar-scanner
+ - ./run-sonar.sh run
 
 addons:
   sonarqube:
