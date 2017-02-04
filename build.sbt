@@ -16,7 +16,6 @@ libraryDependencies ++= Seq(
   //"it.nerdammer.bigdata" % "spark-hbase-connector_2.10" % "1.0.3"
 )
 
-ScoverageSbtPlugin.instrumentSettings
 CoverallsPlugin.coverallsSettings
 
 resolvers += "Apache Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots"
