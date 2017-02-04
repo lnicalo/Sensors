@@ -1,3 +1,5 @@
+import scoverage.ScoverageSbtPlugin
+
 name := "Sensors"
 
 version := "1.0"
@@ -15,8 +17,3 @@ libraryDependencies ++= Seq(
 )
 
 resolvers += "Apache Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots"
-resolvers += Resolver.url("scoverage-bintray", url("https://dl.bintray.com/sksamuel/sbt-plugins/"))(Resolver.ivyStylePatterns)
-
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.3.0")
-
-addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.1.0")
