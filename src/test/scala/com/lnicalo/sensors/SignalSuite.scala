@@ -25,7 +25,7 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     output("3").length should be (3)
   }
 
-  test("signal with strings") {
+  test("compare signal with strings") {
     val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
     sc = new SparkContext(conf)
 
@@ -35,11 +35,23 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     val signal2 = Signal(Array(
       ("1", List((1.5, "on"), (2.5, "off"), (3.5, "off"))),
       ("2", List((10.5, "on"), (20.5, "off"), (30.5, "on"))) ))
-    val d1 = signal1.collect()
-    val d2 = signal2.collect()
+
     val output = (signal1 |==| signal2).collectAsMap()
     output("1") should be (toSeries(List((1.5, false), (2.0, true), (2.5, false), (3.5, false))))
     output("2") should be (toSeries(List((10.5, false), (20.0, true), (20.5, false), (30.0, true), (30.5, false))))
+  }
+
+  test("compare signal with constant string") {
+    val conf = new SparkConf().setMaster("local").setAppName(getClass.getName)
+    sc = new SparkContext(conf)
+
+    val signal1 = Signal(Array(
+      ("1", List((1.0, "off"), (2.0, "on"), (3.0, "on"))),
+      ("2", List((10.0, "off"), (20.0, "on"), (30.0, "off"))) ))
+
+    val output = (signal1 |==| "on").collectAsMap()
+    output("1") should be (toSeries(List((1.0, false), (2.0, true), (3.0, true))))
+    output("2") should be (toSeries(List((10.0, false), (20.0, true), (30.0, false))) )
   }
 
   test("math operations between signals") {
@@ -47,15 +59,20 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     sc = new SparkContext(conf)
 
     val signal1 = Signal(Array(
-      ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
-      ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
+      ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 4.0))),
+      ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 40.0))) ))
     val signal2 = Signal(Array(
-      ("1", List((1.5, 1.5), (2.5, 2.5), (3.5, 3.5))),
+      ("1", List((1.5, 2.0), (2.5, 4.0), (3.5, 5.0))),
       ("2", List((10.5, 10.5), (20.5, 20.5), (30.5, 30.5))) ))
 
-    val output = (signal1 |+| signal2).collectAsMap()
-    output("1") should be (toSeries(List((1.5,2.5), (2.0,3.5), (2.5,4.5), (3.0,5.5), (3.5,6.5))))
-    output("2") should be (toSeries(List((10.5,20.5), (20.0,30.5), (20.5,40.5), (30.0,50.5), (30.5,60.5))))
+    val tmp1 = (3 *: (100 /: signal1 - signal1 / 2.0 * 4.0)) * signal1 / 2.0
+    val tmp2 = - (3 +: signal2) - 5 |+| signal1 |+| 4
+    val tmp3 = tmp1 / signal1
+    val output = (tmp1 - tmp2 |+| tmp3).collectAsMap()
+    output("1") should be (toSeries(
+      List((1.5,299.0), (2.0,211.0), (2.5,213.0), (3.0,131.5), (3.5,132.5)) ))
+    output("2") should be (toSeries(
+      List((10.5,-160.5), (20.0,-1108.0), (20.5,-1098.0), (30.0,-4781.75), (30.5,-4771.75))))
   }
 
   test("math operations with constants") {
@@ -101,17 +118,17 @@ class SignalSuite extends FunSuite with LocalSparkContext with ShouldMatchers {
     output("1") should be (toSeries(List((1.5,true), (2.0,false), (2.5,true), (3.0,false), (3.5,true))))
     output("2") should be (toSeries(List((10.5,true), (20.0,false), (30.5,false))))
 
-    output = ((signal1 |==| signal2) and (signal1 <= signal2)).collectAsMap()
-    output("1") should be (toSeries(List((1.5,false), (2.5,true), (3.0,false), (3.5,false))))
-    output("2") should be (toSeries(List((10.5,false), (30.5,false))))
-
-    output = ((signal1 |==| signal2) and !(signal1 <= signal2)).collectAsMap()
+    output = ((signal1 |==| signal2) and (signal1 >= 3.0)).collectAsMap()
     output("1") should be (toSeries(List((1.5,false), (3.5,false))))
     output("2") should be (toSeries(List((10.5,false), (30.5,false))))
 
-    output = ((signal1 |==| signal2) or !(signal1 <= signal2)).collectAsMap()
-    output("1") should be (toSeries(List((1.5,false), (2.0,true), (3.5,false))))
-    output("2") should be (toSeries(List((10.5,false), (20.0,true), (30.5,true))))
+    output = ((signal1 < signal2 / 2) and !(signal1 > signal2)).collectAsMap()
+    output("1") should be (toSeries(List((1.5,false), (3.5,false))))
+    output("2") should be (toSeries(List((10.5,false), (30.5,false))))
+
+    output = (!(signal1 >= signal2) or (signal1 < 2.0)).collectAsMap()
+    output("1") should be (toSeries(List((1.5,true), (2.0,false), (3.5,true))))
+    output("2") should be (toSeries(List((10.5,true), (20.0,false), (30.5,false))))
   }
 
   test("boolean operation with constants") {
