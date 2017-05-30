@@ -285,8 +285,6 @@ object Signal {
     recursive(v.reverse, w.reverse, Nil)
   }
 
-
-
   def PairWiseFilter[A](v: Series[A], filter: Series[Boolean]): Series[A] =
     Signal.PairWiseOperation(v, filter)((a,b) => if (b.getOrElse(false)) a else None)
 
