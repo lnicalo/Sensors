@@ -19,8 +19,8 @@ dependencies:
     - "~/.sbt"
 
 script: 
- - sbt coverage test coveralls
- - sonar-scanner
+ # - sbt coverage test coveralls
+ - sonar-scanner -X
 
 addons:
   sonarqube:
