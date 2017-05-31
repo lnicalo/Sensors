@@ -30,9 +30,9 @@ current = [(1, null), (2, 2.0), (3, 3.0), (4, 5.0), (5, 5.0), (6, 5.0),  (7, nul
 ~~~~
 and easily multiply both to get the desired output.
 
-Even though, this approach is feasible for relatively small signals. It becomes really hard with big signals collected from long running sensor networks. Replicating samples multiplies the size of time series in memory that grows out of control quite quickly.
+Even though, this approach is feasible for relatively small signals. It becomes really hard with big signals collected from long running sensor networks and thousands of time series. Replicating samples multiplies the size of time series in memory that grows out of control quite quickly. Furthermore, the problem 
 
-This library simplyfies and optimises the workflow with time series.
+This library simplyfies and optimises the workflow with time series using parallel processing with Spark. All Spark are hidden to the user. Nevertheles, the developer can easly access Spark API to extend library capabilities on fly.
 
 # Dependencies
 
