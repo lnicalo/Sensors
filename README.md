@@ -8,16 +8,16 @@ Scala package to process time series from different sensors with Spark
 
 Processing time series collected from different sensors poses several challenges 
 as a result of data may not be aligned or have the same time sampling. 
-Data cannot be writen in tabular form causing that writing data queries 
-can be quite hard for data scientists. They need to deal with the misalignment all the time.
+Writing data queries can be quite hard for data scientists because data cannot be expressed in a tabular form.
 
-For example, you have the next two time series representing voltage and current of certain system:
+For example, the next two time series representing voltage and current of certain system where voltage and current are not measured at the same timestamps:
 ~~~~
 voltage = [(1, 2.0), (3, 3.0), (5, 5.0), (6, null)]
 current = [(2, 2.0), (3, 3.0), (4, 5.0), (7, null)]
 ~~~~
-We represent signals as a list of tuples where the first element 
-is the timestamp and the second element is the value. In the example, 
+
+In this library signals are represented as a list of tuples where the first element 
+is the timestamp and the second element is the value. In the example above, 
 the first value of ``voltage`` at ``timestamp 1``  is ``2.0``, and then
 it changes to ``3.0`` at ``timestamp 3`` and so on.
 
@@ -28,8 +28,8 @@ report the current status of the sensors synchronously. This time series
 reflect the status of the sensor when it was logged. We assume that it 
 stays unchanged until we get the next sample.
 
-Data analyst may want to multiply these two time series to get the 
-instantaneous power like this:
+Take, for example, the case where a data analyst may want to multiply these 
+two time series to get the instantaneous power:
 
 ~~~~
 voltage * current = [(2, 4.0), (3, 6.0), (4, 15.0), (5, 25.0), (6, null)]
@@ -45,7 +45,7 @@ and easily multiply both to get the desired output.
 Even though this approach is feasible for relatively small signals, it
 becomes really hard with big signals collected from long running 
 sensor networks and thousands of time series. Replicating samples 
-multiplies the size of time series in memory that grow out of control
+multiplies the size of time series in memory that grows out of control
 quite quickly.
 
 This library simplifies and optimises time series processing 
@@ -64,9 +64,32 @@ The library sits on other excellent Java and Scala libraries.
 ## Creating signals
 
 ``Signal`` class is the main abstraction of the library. It is an extended
-RDD tailored for time series processing. Signal is essentially a parallel
-array of list of tuples. When collecting data from sensor network, you may have
-different trials, experiments, journeys, etc. 
+RDD tailored for time series processing. ``Signal`` class is essentially a parallel
+array of list of tuples. Each tuple corresponds to time series identified with a number that 
+can mean the identifier of a trial, date, journey if you are collecting data from vehicles.
+
+```scala
+current = [
+      ("2017-08-25", [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)] ),
+      ("2017-08-26", [(10.0, 10.0), (20.0, 20.0), (30.0, 30.0)] )
+      ...
+      ("2018-08-26", [(10.0, 10.0), (20.0, 20.0), (30.0, 30.0)] )
+      ]
+      
+voltage = [
+      ("2017-08-25", [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)] ),
+      ("2017-08-26", [(10.0, 10.0), (20.0, 20.0), (30.0, 30.0)] )
+      ...
+      ("2018-08-26", [(10.0, 10.0), (20.0, 20.0), (30.0, 30.0)] )
+      ]
+```
+
+<aside class="notice">
+You need to collect data in individual trials. The library spreads the trials accros the cluster by using Spark.
+If you have one long trial you will not get any benefit from the library because signals cannot be processed in parallel.
+
+
+</aside
 
 For example, imagine you are logging data from a car and you would like
 to collect the data by day or by journey. In this case, the key or 
@@ -86,6 +109,8 @@ val current = Signal(Array(
       ("1", List((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))),
       ("2", List((10.0, 10.0), (20.0, 20.0), (30.0, 30.0))) ))
 ```
+``1`` and ``2`` are the identifiers of the day, trial or journey.
+
 #### From RDD
 Signals can created from Spark RDD as follows:
 ```scala
@@ -118,7 +143,7 @@ val output = (tmp1 - tmp2 |+| tmp3).collectAsMap()
 __Note__: *As of this version, ``signal`` class do not show exactly as 
 fractional. For example, API presents rare operators like 
 ```+:``` or ```|+|```. There are plans to develop a more friendly API 
-that presents the four operator: ```+, -, *, /```*
+that presents the four operators: ```+, -, *, /```*
 
 #### Aggregation operations
 
@@ -170,9 +195,9 @@ val output = current
 ##### Split signals
 Signals can be split into several chunks based on the signal itself or
 other signals. This is particularly useful when we need to know the 
-average voltage each time current is larger than 2. Note the difference
+average voltage each time the current is larger than 2. Note the difference
 with the filtering case. In this case, we are split each time series 
-into different chunk based on other time series. Each chunk turns into
+into different chunks based on other time series. Each chunk turns into
 a new time series where we can extract statistics from.
 
 ```scala
@@ -198,7 +223,7 @@ val output = current
 Signals can be binned based on other time series. This can be used when
 we would like to extract statistics grouped by values.
 
-For example, we would like to know the time that ``current `` is larger than 2.0
+For example, we would like to know the time lentght that ``current `` is larger than 2.0
 
 ```scala
 val output = current
